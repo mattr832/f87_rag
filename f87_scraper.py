@@ -12,7 +12,7 @@ HEADERS = {
     "User-Agent": "F87M2-RAG-Bot (Contact: mattr832@gmail.com)"
 }
 DELAY = 1.0  # seconds between requests
-MAX_PAGES = 1
+MAX_PAGES = 18
 THREADS_PER_PAGE = 36
 MAX_TOKENS_PER_CHUNK = 400
 OVERLAP_TOKENS = 50
@@ -108,14 +108,19 @@ def chunk_text(text, max_tokens=MAX_TOKENS_PER_CHUNK, overlap=OVERLAP_TOKENS):
 def chunk_all_threads(threads):
     chunked_docs = []
     for thread in threads:
-        chunks = chunk_text(thread.get("content", ""))
-        for i, chunk in enumerate(chunks):
-            chunked_docs.append({
-                "title": thread.get("title", "Untitled"),
-                "chunk_index": i,
-                "text": chunk,
-                "url": thread["url"]
-            })
+        try:
+            chunks = chunk_text(thread.get("content", ""))
+            for i, chunk in enumerate(chunks):
+                chunked_docs.append({
+                    "title": thread.get("title", "Untitled"),
+                    "chunk_index": i,
+                    "text": chunk,
+                    "url": thread["url"]
+                })
+        except Exception as e:
+            print(f"[Error] Skipping thread: '{thread.get('title', 'Untitled')}'")
+            print(f"Reason: {e}")
+            continue  # explicitly skip to the next thread
     return chunked_docs
 
 # --- Execution ---
