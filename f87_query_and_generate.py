@@ -6,8 +6,8 @@ from openai import OpenAI
 # === CONFIG ===
 client = OpenAI(api_key="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")  # Replace with your key
 EMBED_MODEL = "text-embedding-3-small"
-# CHAT_MODEL = "gpt-3.5-turbo"
-CHAT_MODEL = "gpt-4"
+CHAT_MODEL = "gpt-3.5-turbo"
+# CHAT_MODEL = "gpt-4"
 TOP_K = 10
 
 # === Load FAISS Index and Metadata ===
