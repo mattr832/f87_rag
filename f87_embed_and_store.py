@@ -21,23 +21,30 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# === INIT FAISS INDEX ===
-index = faiss.IndexFlatL2(VECTOR_DIM)
+# === Initialize Cosine Similarity Index ===
+index = faiss.IndexFlatIP(1536)
 metadata_store = []
 
 # === EMBED & STORE ===
 for chunk in tqdm(chunks, desc="Embedding chunks"):
     try:
         embedding = get_embedding(chunk["text"])
-        index.add(np.array([embedding], dtype="float32"))
+
+        # Normalize to unit length (required for cosine similarity)
+        embedding = np.array(embedding, dtype="float32").reshape(1, -1)
+        faiss.normalize_L2(embedding)
+
+        index.add(embedding)
 
         metadata_store.append({
             "title": chunk.get("title", "Untitled"),
             "url": chunk["url"],
             "text": chunk["text"]
         })
+
     except Exception as e:
         print(f"[ERROR] Failed to embed chunk from '{chunk.get('title', 'Untitled')}': {e}")
+        continue
 
 # === SAVE INDEX & METADATA ===
 faiss.write_index(index, "f87_faiss.index")
