@@ -8,6 +8,10 @@ from openai import OpenAI
 # === CONFIG ===
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# Runtime check for key
+if not openai_api_key or openai_api_key.startswith("sk-old"):
+    print("⚠️ Invalid or outdated OpenAI API key loaded. Please check your .env file.")
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-3.5-turbo"
