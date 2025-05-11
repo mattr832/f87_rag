@@ -6,6 +6,9 @@ import numpy as np
 import streamlit as st
 from openai import OpenAI
 
+# === MUST BE FIRST ===
+st.set_page_config(page_title="F87 M2 Chat Assistant", layout="wide")
+
 # === CONFIG ===
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -16,8 +19,9 @@ if not openai_api_key or openai_api_key.startswith("sk-old"):
     st.stop()
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
-CHAT_MODEL = "gpt-3.5-turbo"
-TOP_K = 10
+# CHAT_MODEL = st.selectbox("Choose a model:", ["gpt-3.5-turbo", "gpt-4-turbo"], index=0)
+CHAT_MODEL = "gpt-4-turbo"
+TOP_K = 5
 
 # === Load Data ===
 index = faiss.read_index("f87_faiss.index")
@@ -64,8 +68,7 @@ def generate_answer(prompt):
     return response.choices[0].message.content.strip()
 
 # === Streamlit UI ===
-st.set_page_config(page_title="F87 M2 Chat Assistant", layout="wide")
-st.title("💬 F87 M2 Multi-Turn Assistant")
+st.title("💬 F87 M2 AI Assistant")
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []  # list of (question, answer) tuples
