@@ -1,13 +1,16 @@
 import json
+import os
+from dotenv import load_dotenv
 import faiss
 import numpy as np
 from openai import OpenAI
 
 # === CONFIG ===
-client = OpenAI(api_key="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")  # Replace with your key
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-3.5-turbo"
-# CHAT_MODEL = "gpt-4"
 TOP_K = 10
 
 # === Load FAISS Index and Metadata ===

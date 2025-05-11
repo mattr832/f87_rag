@@ -1,11 +1,15 @@
 import json
+import os
+from dotenv import load_dotenv
 import faiss
 import numpy as np
 import streamlit as st
 from openai import OpenAI
 
 # === CONFIG ===
-client = OpenAI(api_key="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")  # Replace securely in production
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-3.5-turbo"
 TOP_K = 10
@@ -15,7 +19,7 @@ index = faiss.read_index("f87_faiss.index")
 with open("f87_metadata.json", "r", encoding="utf-8") as f:
     metadata = json.load(f)
 
-# === Embed Query ===
+# === Utilities ===
 def embed_query(query):
     response = client.embeddings.create(
         input=[query],
@@ -25,13 +29,12 @@ def embed_query(query):
     faiss.normalize_L2(vec)
     return vec
 
-# === Retrieve Relevant Chunks ===
 def retrieve_context(query_embedding, top_k=TOP_K):
     distances, indices = index.search(query_embedding, top_k)
     return [metadata[i] for i in indices[0]]
 
-# === Build Prompt ===
-def build_prompt(context_chunks, question):
+def build_prompt(history, current_question, context_chunks):
+    history_text = "\n\n".join(f"Q: {q}\nA: {a}" for q, a in history)
     context = "\n\n".join(f"- {chunk['text']}" for chunk in context_chunks)
     return f"""You are a helpful assistant with access to the Bimmerpost F87 M2 forums.
 
@@ -39,10 +42,14 @@ Answer the user's question using ONLY the information provided in the following 
 
 {context}
 
-Question: {question}
+Previous conversation:
+{history_text}
+
+Current question:
+{current_question}
+
 Answer:"""
 
-# === Generate GPT Answer ===
 def generate_answer(prompt):
     response = client.chat.completions.create(
         model=CHAT_MODEL,
@@ -52,22 +59,47 @@ def generate_answer(prompt):
     return response.choices[0].message.content.strip()
 
 # === Streamlit UI ===
-st.set_page_config(page_title="F87 M2 RAG Assistant", layout="wide")
-st.title("🔧 F87 M2 Forum Assistant")
-st.write("Ask a question and get grounded answers from Bimmerpost threads.")
+st.set_page_config(page_title="F87 M2 Chat Assistant", layout="wide")
+st.title("💬 F87 M2 Multi-Turn Assistant")
 
-question = st.text_input("Enter your question about the F87 M2")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []  # list of (question, answer) tuples
 
-if st.button("Search") and question:
-    with st.spinner("Retrieving relevant forum posts..."):
-        query_embedding = embed_query(question)
+# === Clear Chat Button ===
+if st.button("🧹 Clear Chat"):
+    st.session_state.chat_history = []
+    st.success("Chat history cleared.")
+
+# === Display chat history ===
+for i, (q, a) in enumerate(st.session_state.chat_history):
+    st.markdown(f"**Q{i+1}: {q}**")
+    st.markdown(f"{a}")
+    st.markdown("---")
+
+# === Input area ===
+new_question = st.text_input("Ask a question about the F87 M2")
+if st.button("Ask") and new_question:
+    with st.spinner("Retrieving and generating..."):
+        # Embed the current question (with context if needed)
+        full_context_query = new_question
+        query_embedding = embed_query(full_context_query)
         context_chunks = retrieve_context(query_embedding)
-        prompt = build_prompt(context_chunks, question)
+
+        # Build prompt including history
+        prompt = build_prompt(st.session_state.chat_history, new_question, context_chunks)
         answer = generate_answer(prompt)
 
-    st.subheader("🔎 GPT Answer")
-    st.write(answer)
+        # Update chat history
+        st.session_state.chat_history.append((new_question, answer))
 
-    st.subheader("📚 Retrieved Sources")
-    for chunk in context_chunks:
-        st.markdown(f"**{chunk['title']}**  \n{chunk['text'][:300]}...  \n🔗 [{chunk['url']}]({chunk['url']})")
+        # Display answer immediately
+        st.markdown(f"**You:** {new_question}")
+        st.markdown(f"**Assistant:** {answer}")
+        st.markdown("---")
+
+        # Show sources
+        st.subheader("📚 Retrieved Sources")
+        for i, chunk in enumerate(context_chunks):
+            with st.expander(f"Source {i+1}: {chunk['title']}"):
+                st.markdown(f"**URL:** [{chunk['url']}]({chunk['url']})")
+                st.markdown(f"**Preview:** {chunk['text'][:500]}...")
