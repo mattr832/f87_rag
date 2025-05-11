@@ -31,19 +31,25 @@ This Streamlit app is a Retrieval-Augmented Generation (RAG) assistant trained o
 ```bash
 git clone https://github.com/yourusername/f87-m2-chat
 cd f87-m2-chat
+```
 
 ### 2. Create .env
 ```bash
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
 ### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
+```
 
 ### 4. Run the app
 ```bash
 streamlit run f87_rag_app.py
+```
 
+📁 Project Structure
+```graphql
 f87-m2-chat/
 ├── f87_rag_app.py          # Main Streamlit app
 ├── f87_faiss.index         # FAISS vector index of forum content
@@ -51,6 +57,7 @@ f87-m2-chat/
 ├── requirements.txt        # Python dependencies
 └── .streamlit/
     ├── config.toml         # Streamlit server config
+```
 
 📖 How It Works (RAG Pipeline)
 Embeds the user question using text-embedding-3-small
