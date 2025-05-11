@@ -67,8 +67,6 @@ def generate_answer(prompt):
 st.set_page_config(page_title="F87 M2 Chat Assistant", layout="wide")
 st.title("💬 F87 M2 Multi-Turn Assistant")
 
-st.write("Key prefix:", openai_api_key[:1000])  # Should match your new key
-
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []  # list of (question, answer) tuples
 
