@@ -19,7 +19,6 @@ if not openai_api_key or openai_api_key.startswith("sk-old"):
     st.stop()
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
-# CHAT_MODEL = st.selectbox("Choose a model:", ["gpt-3.5-turbo", "gpt-4-turbo"], index=0)
 CHAT_MODEL = "gpt-4-turbo"
 TOP_K = 5
 
@@ -68,6 +67,20 @@ def generate_answer(prompt):
     return response.choices[0].message.content.strip()
 
 # === Streamlit UI ===
+
+st.sidebar.title("Options")
+if st.sidebar.button("💾 Export Chat"):
+    if st.session_state.chat_history:
+        chat_export = "\n\n".join([f"Q: {q}\nA: {a}" for q, a in st.session_state.chat_history])
+        st.sidebar.download_button(
+            label="Download Chat as .txt",
+            data=chat_export,
+            file_name="f87_chat_history.txt",
+            mime="text/plain"
+        )
+    else:
+        st.sidebar.info("No chat history to export.")
+
 st.title("💬 F87 M2 AI Assistant")
 
 if "chat_history" not in st.session_state:
@@ -93,6 +106,13 @@ if st.button("Ask") and new_question:
         query_embedding = embed_query(full_context_query)
         context_chunks = retrieve_context(query_embedding)
 
+        # Compute confidence score
+        distances, _ = index.search(query_embedding, TOP_K)
+        weights = np.array([1 / (i + 1) for i in range(TOP_K)], dtype="float32")
+        weights /= weights.sum()
+        avg_similarity = float(np.dot(distances[0], weights))
+        confidence_pct = round(avg_similarity * 100, 1)
+
         # Build prompt including history
         prompt = build_prompt(st.session_state.chat_history, new_question, context_chunks)
         answer = generate_answer(prompt)
@@ -103,7 +123,24 @@ if st.button("Ask") and new_question:
         # Display answer immediately
         st.markdown(f"**You:** {new_question}")
         st.markdown(f"**Assistant:** {answer}")
+
+        # Confidence level display
+        if confidence_pct >= 80:
+            label, color = "High", "green"
+        elif confidence_pct >= 60:
+            label, color = "Medium", "orange"
+        else:
+            label, color = "Low", "red"
+        st.markdown(f"**Confidence Level:** {label}")
+
         st.markdown("---")
+
+        # Show most influential chunk
+        most_influential_chunk = context_chunks[0]
+        st.subheader("🌟 Most Influential Source")
+        st.markdown(f"**Title:** {most_influential_chunk['title']}")
+        st.markdown(f"**URL:** [{most_influential_chunk['url']}]({most_influential_chunk['url']})")
+        st.markdown(f"**Excerpt:** {most_influential_chunk['text'][:500]}...")
 
         # Show sources
         st.subheader("📚 Retrieved Sources")
