@@ -8,6 +8,8 @@ from transformers import GPT2TokenizerFast
 # === CONFIGURATION ===
 BASE_URL = "https://f87.bimmerpost.com/forums/"
 FORUM_URL_TEMPLATES = [
+    BASE_URL + "forumdisplay.php?f=652&page={}",  # Cosmetic
+    BASE_URL + "forumdisplay.php?f=646&page={}",  # Wheels/Tires
     BASE_URL + "forumdisplay.php?f=653&page={}",  # Maintenance
     BASE_URL + "forumdisplay.php?f=654&page={}",  # Suspension and Brakes
     BASE_URL + "forumdisplay.php?f=722&page={}",  # S55
@@ -18,7 +20,7 @@ HEADERS = {
     "User-Agent": "F87M2-RAG-Bot (Contact: mattr832@gmail.com)"
 }
 DELAY = 1.0
-MAX_PAGES = 20
+MAX_PAGES = 40
 THREADS_PER_PAGE = 36
 MAX_TOKENS_PER_CHUNK = 400
 OVERLAP_TOKENS = 50

@@ -5,9 +5,11 @@ import faiss
 import numpy as np
 import streamlit as st
 from openai import OpenAI
+import requests
+from datetime import datetime
 
 # === MUST BE FIRST ===
-st.set_page_config(page_title="F87 M2 Chat Assistant", layout="wide")
+st.set_page_config(page_title="F87 M2 AI Assistant", layout="wide")
 
 # === CONFIG ===
 load_dotenv()
@@ -20,7 +22,7 @@ if not openai_api_key or openai_api_key.startswith("sk-old"):
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4-turbo"
-TOP_K = 5
+TOP_K = 7
 
 # === Load Data ===
 index = faiss.read_index("f87_faiss.index")
@@ -42,7 +44,7 @@ def retrieve_context(query_embedding, top_k=TOP_K):
     return [metadata[i] for i in indices[0]]
 
 def build_prompt(history, current_question, context_chunks):
-    history_text = "\n\n".join(f"Q: {q}\nA: {a}" for q, a in history)
+    history_text = "\n\n".join(f"Q: {entry['question']}\nA: {entry['answer']}" for entry in history)
     context = "\n\n".join(f"- {chunk['text']}" for chunk in context_chunks)
     return f"""You are a helpful assistant with access to the Bimmerpost F87 M2 forums.
 
@@ -66,12 +68,39 @@ def generate_answer(prompt):
     )
     return response.choices[0].message.content.strip()
 
-# === Streamlit UI ===
+def send_to_slack(question, answer, confidence_label, top_chunk_url, user_comment=None):
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        print("⚠️ SLACK_WEBHOOK_URL not set.")
+        return
 
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    message = (
+    f"*🚩 Flagged Response*\n"
+    f"*Time:* {timestamp}\n"
+    f"*Confidence:* {confidence_label}\n"
+    f"*Top Source:* {top_chunk_url}\n"
+    f"*Q:* {question}\n"
+    f"*A:* {answer}"
+)
+    if user_comment:
+        message += f"\n*User Comment:* {user_comment}"
+
+    try:
+        response = requests.post(webhook_url, json={"text": message})
+        print(f"[Slack] Status: {response.status_code}")
+        print(f"[Slack] Response: {response.text}")
+    except Exception as e:
+        print(f"[Slack] Failed to send alert: {e}")
+
+# ====================
+# === Streamlit UI ===
 st.sidebar.title("Options")
 if st.sidebar.button("💾 Export Chat"):
     if st.session_state.chat_history:
-        chat_export = "\n\n".join([f"Q: {q}\nA: {a}" for q, a in st.session_state.chat_history])
+        chat_export = "\n\n".join(
+            [f"Q: {entry['question']}\nA: {entry['answer']}" for entry in st.session_state.chat_history]
+        )
         st.sidebar.download_button(
             label="Download Chat as .txt",
             data=chat_export,
@@ -84,7 +113,19 @@ if st.sidebar.button("💾 Export Chat"):
 st.title("💬 F87 M2 AI Assistant")
 
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []  # list of (question, answer) tuples
+    st.session_state.chat_history = []
+
+# Convert old (q, a) tuples to dicts with new structure
+for i in range(len(st.session_state.chat_history)):
+    item = st.session_state.chat_history[i]
+    if isinstance(item, tuple):
+        q, a = item
+        st.session_state.chat_history[i] = {
+            "question": q,
+            "answer": a,
+            "confidence": "Unknown",
+            "top_url": "N/A"
+        }
 
 # === Clear Chat Button ===
 if st.button("🧹 Clear Chat"):
@@ -92,10 +133,39 @@ if st.button("🧹 Clear Chat"):
     st.success("Chat history cleared.")
 
 # === Display chat history ===
-for i, (q, a) in enumerate(st.session_state.chat_history):
-    st.markdown(f"**Q{i+1}: {q}**")
-    st.markdown(f"{a}")
+for i, entry in enumerate(st.session_state.chat_history):
+    st.markdown(f"**Q{i+1}: {entry['question']}**")
+    st.markdown(f"{entry['answer']}")
+
+    # user_comment = st.text_area(
+    #     "Optional comment (why are you flagging this?)",
+    #     key=f"report_comment_{i}"
+    # )
+
+    if st.button("🚩 Report This Response", key=f"report_{i}"):
+        st.session_state.report_requested = True
+
+    if st.session_state.report_requested:
+        send_to_slack(
+            entry['question'],
+            entry['answer'],
+            entry.get("confidence", "Unknown"),
+            entry.get("top_url", "N/A")
+            # st.session_state.get("report_comment", "")
+        )
+
+        # Clear input and set transient feedback flag
+        # st.session_state.report_comment = ""  # clear the comment
+        st.session_state.report_feedback_shown = True
+        st.session_state.report_requested = False
+        if st.session_state.get("report_feedback_shown"):
+            st.success("This response has been flagged and sent for review. Thank you!")
+            st.session_state.report_feedback_shown = False
+
     st.markdown("---")
+
+if "report_requested" not in st.session_state:
+    st.session_state.report_requested = False
 
 # === Input area ===
 new_question = st.text_input("Ask a question about the F87 M2")
@@ -105,6 +175,7 @@ if st.button("Ask") and new_question:
         full_context_query = new_question
         query_embedding = embed_query(full_context_query)
         context_chunks = retrieve_context(query_embedding)
+        most_influential_chunk = context_chunks[0]
 
         # Compute confidence score
         distances, _ = index.search(query_embedding, TOP_K)
@@ -113,34 +184,67 @@ if st.button("Ask") and new_question:
         avg_similarity = float(np.dot(distances[0], weights))
         confidence_pct = round(avg_similarity * 100, 1)
 
-        # Build prompt including history
-        prompt = build_prompt(st.session_state.chat_history, new_question, context_chunks)
-        answer = generate_answer(prompt)
-
-        # Update chat history
-        st.session_state.chat_history.append((new_question, answer))
-
-        # Display answer immediately
-        st.markdown(f"**You:** {new_question}")
-        st.markdown(f"**Assistant:** {answer}")
-
-        # Confidence level display
+        # Calculate confidence level
         if confidence_pct >= 80:
             label, color = "High", "green"
         elif confidence_pct >= 60:
             label, color = "Medium", "orange"
         else:
             label, color = "Low", "red"
+
+        # Build prompt including history
+        prompt = build_prompt(st.session_state.chat_history, new_question, context_chunks)
+        answer = generate_answer(prompt)
+
+        # Display new response immediately
+        st.markdown(f"**You:** {new_question}")
+        st.markdown(f"**Assistant:** {answer}")
+        
+        # Display confidence level
         st.markdown(f"**Confidence Level:** {label}")
+
+        # Create report button
+        if st.button("🚩 Report This Response", key="report_latest"):
+            st.session_state.report_requested = True
+            # user_comment = st.text_area(
+            #     "Optional comment (why are you flagging this?)",
+            #     key="report_comment_latest"
+            #     )
+
+        if st.session_state.report_requested:
+            send_to_slack(
+                new_question,
+                answer,
+                label,
+                most_influential_chunk["url"]
+                # st.session_state.get("report_comment_latest", "")
+            )
+
+            # Clear input and set transient feedback flag
+            # st.session_state.report_comment = ""  # clear the comment
+            st.session_state.report_feedback_shown = True
+            st.session_state.report_requested = False
+            if st.session_state.get("report_feedback_shown"):
+                st.success("This response has been flagged and sent for review. Thank you!")
+                st.session_state.report_feedback_shown = False
+
+        # THEN append it to chat history for persistence
+        st.session_state.chat_history.append({
+            "question": new_question,
+            "answer": answer,
+            "confidence": label,
+            "top_url": most_influential_chunk["url"]
+        })
 
         st.markdown("---")
 
         # Show most influential chunk
-        most_influential_chunk = context_chunks[0]
         st.subheader("🌟 Most Influential Source")
         st.markdown(f"**Title:** {most_influential_chunk['title']}")
         st.markdown(f"**URL:** [{most_influential_chunk['url']}]({most_influential_chunk['url']})")
         st.markdown(f"**Excerpt:** {most_influential_chunk['text'][:500]}...")
+
+        st.markdown("---")
 
         # Show sources
         st.subheader("📚 Retrieved Sources")
