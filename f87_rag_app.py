@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 from openai import OpenAI
 import requests
+import urllib.request
 from datetime import datetime
 
 # === MUST BE FIRST ===
@@ -14,6 +15,12 @@ st.set_page_config(page_title="F87 M2 AI Assistant", layout="wide")
 # === CONFIG ===
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
+INDEX_URL = "https://github.com/mattr832/f87_rag/releases/download/v1.0/f87_faiss.index"
+INDEX_PATH = "f87_faiss.index"
+
+if not os.path.exists(INDEX_PATH):
+    with st.spinner("Setting things up..."):
+        urllib.request.urlretrieve(INDEX_URL, INDEX_PATH)
 
 # Runtime check for key
 if not openai_api_key or openai_api_key.startswith("sk-old"):
@@ -25,7 +32,7 @@ CHAT_MODEL = "gpt-4-turbo"
 TOP_K = 7
 
 # === Load Data ===
-index = faiss.read_index("f87_faiss.index")
+index = faiss.read_index(INDEX_PATH)
 with open("f87_metadata.json", "r", encoding="utf-8") as f:
     metadata = json.load(f)
 
@@ -137,11 +144,6 @@ for i, entry in enumerate(st.session_state.chat_history):
     st.markdown(f"**Q{i+1}: {entry['question']}**")
     st.markdown(f"{entry['answer']}")
 
-    # user_comment = st.text_area(
-    #     "Optional comment (why are you flagging this?)",
-    #     key=f"report_comment_{i}"
-    # )
-
     if st.button("🚩 Report This Response", key=f"report_{i}"):
         st.session_state.report_requested = True
 
@@ -151,7 +153,6 @@ for i, entry in enumerate(st.session_state.chat_history):
             entry['answer'],
             entry.get("confidence", "Unknown"),
             entry.get("top_url", "N/A")
-            # st.session_state.get("report_comment", "")
         )
 
         # Clear input and set transient feedback flag
@@ -166,6 +167,20 @@ for i, entry in enumerate(st.session_state.chat_history):
 
 if "report_requested" not in st.session_state:
     st.session_state.report_requested = False
+
+if "latest_qa" in st.session_state:
+    st.markdown(f"**You:** {st.session_state['latest_qa']['question']}")
+    st.markdown(f"**Assistant:** {st.session_state['latest_qa']['answer']}")
+    st.markdown(f"**Confidence Level:** {st.session_state['latest_qa']['confidence']}")
+
+    if st.button("🚩 Report This Response", key="report_latest_button"):
+        send_to_slack(
+            st.session_state["latest_qa"]["question"],
+            st.session_state["latest_qa"]["answer"],
+            st.session_state["latest_qa"]["confidence"],
+            st.session_state["latest_qa"]["top_url"]
+        )
+        st.success("This response has been flagged and sent for review. Thank you!")
 
 # === Input area ===
 new_question = st.text_input("Ask a question about the F87 M2")
@@ -196,45 +211,16 @@ if st.button("Ask") and new_question:
         prompt = build_prompt(st.session_state.chat_history, new_question, context_chunks)
         answer = generate_answer(prompt)
 
-        # Display new response immediately
-        st.markdown(f"**You:** {new_question}")
-        st.markdown(f"**Assistant:** {answer}")
-        
-        # Display confidence level
-        st.markdown(f"**Confidence Level:** {label}")
-
-        # Create report button
-        if st.button("🚩 Report This Response", key="report_latest"):
-            st.session_state.report_requested = True
-            # user_comment = st.text_area(
-            #     "Optional comment (why are you flagging this?)",
-            #     key="report_comment_latest"
-            #     )
-
-        if st.session_state.report_requested:
-            send_to_slack(
-                new_question,
-                answer,
-                label,
-                most_influential_chunk["url"]
-                # st.session_state.get("report_comment_latest", "")
-            )
-
-            # Clear input and set transient feedback flag
-            # st.session_state.report_comment = ""  # clear the comment
-            st.session_state.report_feedback_shown = True
-            st.session_state.report_requested = False
-            if st.session_state.get("report_feedback_shown"):
-                st.success("This response has been flagged and sent for review. Thank you!")
-                st.session_state.report_feedback_shown = False
-
-        # THEN append it to chat history for persistence
-        st.session_state.chat_history.append({
+        # Store for persistent display and report handling
+        st.session_state["latest_qa"] = {
             "question": new_question,
             "answer": answer,
             "confidence": label,
             "top_url": most_influential_chunk["url"]
-        })
+        }
+
+        # Append to chat history
+        st.session_state.chat_history.append(st.session_state["latest_qa"])
 
         st.markdown("---")
 
