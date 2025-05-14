@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 from openai import OpenAI
 import requests
+import urllib.request
 from datetime import datetime
 
 # === MUST BE FIRST ===
@@ -14,6 +15,12 @@ st.set_page_config(page_title="F87 M2 AI Assistant", layout="wide")
 # === CONFIG ===
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
+INDEX_URL = "https://github.com/mattr832/f87_rag/releases/download/v1.1/f87_faiss.index"
+INDEX_PATH = "f87_faiss.index"
+
+if not os.path.exists(INDEX_PATH):
+    with st.spinner("Setting things up..."):
+        urllib.request.urlretrieve(INDEX_URL, INDEX_PATH)
 
 # Runtime check for key
 if not openai_api_key or openai_api_key.startswith("sk-old"):
@@ -22,10 +29,10 @@ if not openai_api_key or openai_api_key.startswith("sk-old"):
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4-turbo"
-TOP_K = 7
+TOP_K = 6
 
 # === Load Data ===
-index = faiss.read_index("f87_faiss.index")
+index = faiss.read_index(INDEX_PATH)
 with open("f87_metadata.json", "r", encoding="utf-8") as f:
     metadata = json.load(f)
 
