@@ -143,11 +143,7 @@ if st.button("🧹 Clear Chat"):
 for i, entry in enumerate(st.session_state.chat_history):
     st.markdown(f"**Q{i+1}: {entry['question']}**")
     st.markdown(f"{entry['answer']}")
-
-    # user_comment = st.text_area(
-    #     "Optional comment (why are you flagging this?)",
-    #     key=f"report_comment_{i}"
-    # )
+    st.markdown(f"{entry.get("confidence", "Unknown")}")
 
     if st.button("🚩 Report This Response", key=f"report_{i}"):
         st.session_state.report_requested = True
@@ -158,11 +154,9 @@ for i, entry in enumerate(st.session_state.chat_history):
             entry['answer'],
             entry.get("confidence", "Unknown"),
             entry.get("top_url", "N/A")
-            # st.session_state.get("report_comment", "")
         )
 
         # Clear input and set transient feedback flag
-        # st.session_state.report_comment = ""  # clear the comment
         st.session_state.report_feedback_shown = True
         st.session_state.report_requested = False
         if st.session_state.get("report_feedback_shown"):
@@ -213,10 +207,6 @@ if st.button("Ask") and new_question:
         # Create report button
         if st.button("🚩 Report This Response", key="report_latest"):
             st.session_state.report_requested = True
-            # user_comment = st.text_area(
-            #     "Optional comment (why are you flagging this?)",
-            #     key="report_comment_latest"
-            #     )
 
         if st.session_state.report_requested:
             send_to_slack(
@@ -224,11 +214,9 @@ if st.button("Ask") and new_question:
                 answer,
                 label,
                 most_influential_chunk["url"]
-                # st.session_state.get("report_comment_latest", "")
             )
 
             # Clear input and set transient feedback flag
-            # st.session_state.report_comment = ""  # clear the comment
             st.session_state.report_feedback_shown = True
             st.session_state.report_requested = False
             if st.session_state.get("report_feedback_shown"):
