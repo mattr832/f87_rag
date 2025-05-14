@@ -143,7 +143,7 @@ if st.button("🧹 Clear Chat"):
 for i, entry in enumerate(st.session_state.chat_history):
     st.markdown(f"**Q{i+1}: {entry['question']}**")
     st.markdown(f"{entry['answer']}")
-    st.markdown(f"{entry.get("confidence", "Unknown")}")
+    st.markdown(f"**Confidence Level:** {entry.get("confidence", "Unknown")}")
 
     if st.button("🚩 Report This Response", key=f"report_{i}"):
         st.session_state.report_requested = True
