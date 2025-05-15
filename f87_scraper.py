@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import time
 import json
 from tqdm import tqdm
+import nltk
 from transformers import GPT2TokenizerFast
 
 # === CONFIGURATION ===
@@ -60,6 +61,10 @@ def extract_thread_links(forum_page_html):
 
 def extract_thread_content(thread_html):
     soup = BeautifulSoup(thread_html, "html.parser")
+
+    # Remove quoted replies
+    for quote in soup.find_all("div", class_=["quote", "bbcode_quote"]):
+        quote.decompose()
     posts = soup.select("div.thePostItself")
     content = "\n\n".join(post.get_text(strip=True) for post in posts)
     return {"content": content}
@@ -97,15 +102,20 @@ tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 def chunk_text(text, max_tokens=MAX_TOKENS_PER_CHUNK, overlap=OVERLAP_TOKENS):
     if not text:
         return []
-    tokens = tokenizer.encode(text)[:1024]
+
+    tokens = tokenizer.encode(text)
     chunks = []
     start = 0
+
     while start < len(tokens):
-        end = start + max_tokens
+        end = min(start + max_tokens, len(tokens))
         chunk_tokens = tokens[start:end]
-        chunk_text = tokenizer.decode(chunk_tokens)
+        chunk_text = tokenizer.decode(chunk_tokens, skip_special_tokens=True)
         chunks.append(chunk_text.strip())
+
+        # Move the window forward with overlap
         start += max_tokens - overlap
+
     return chunks
 
 def chunk_all_threads(threads):
