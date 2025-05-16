@@ -9,7 +9,8 @@ import requests
 import urllib.request
 from datetime import datetime
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+# from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 # === MUST BE FIRST ===
@@ -107,12 +108,19 @@ def send_to_slack(question, answer, confidence_label, top_chunk_url, user_commen
         print(f"[Slack] Failed to send alert: {e}")
 
 def log_to_google_sheets(question, answer, context_chunks):
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+
+    # Load from Streamlit secrets
+    service_account_info = st.secrets["gcp_service_account"]
+    creds = Credentials.from_service_account_info(service_account_info, scopes=scope)
     client = gspread.authorize(creds)
 
     sheet = client.open("f87_rag_logs").sheet1
 
+    from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     row = [timestamp, question, answer] + [chunk["text"][:500] for chunk in context_chunks]
     sheet.append_row(row)
