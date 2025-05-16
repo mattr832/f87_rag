@@ -118,7 +118,7 @@ def chunk_text(text, max_tokens=MAX_TOKENS_PER_CHUNK, overlap=OVERLAP_TOKENS):
 
     return chunks
 
-def chunk_all_threads(threads):
+def chunk_all_threads(threads): 
     chunked_docs = []
     for thread in threads:
         try:
