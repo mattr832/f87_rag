@@ -8,6 +8,9 @@ from openai import OpenAI
 import requests
 import urllib.request
 from datetime import datetime
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
 # === MUST BE FIRST ===
 st.set_page_config(page_title="F87 M2 AI Assistant", layout="wide")
@@ -26,7 +29,10 @@ if not os.path.exists(INDEX_PATH):
 if not openai_api_key or openai_api_key.startswith("sk-old"):
     st.error("⚠️ Invalid or outdated OpenAI API key loaded. Please check your .env file.")
     st.stop()
+
+# Manage connections and configs
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
+
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4-turbo"
 TOP_K = 6
@@ -99,6 +105,17 @@ def send_to_slack(question, answer, confidence_label, top_chunk_url, user_commen
         print(f"[Slack] Response: {response.text}")
     except Exception as e:
         print(f"[Slack] Failed to send alert: {e}")
+
+def log_to_google_sheets(question, answer, context_chunks):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    client = gspread.authorize(creds)
+
+    sheet = client.open("f87_rag_logs").sheet1
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    row = [timestamp, question, answer] + [chunk["text"][:500] for chunk in context_chunks]
+    sheet.append_row(row)
 
 # ====================
 # === Streamlit UI ===
@@ -196,6 +213,9 @@ if st.button("Ask") and new_question:
         # Build prompt including history
         prompt = build_prompt(st.session_state.chat_history, new_question, context_chunks)
         answer = generate_answer(prompt)
+
+        # Log to Google Sheets
+        log_to_google_sheets(new_question, answer, context_chunks)
 
         # Display new response immediately
         st.markdown(f"**You:** {new_question}")

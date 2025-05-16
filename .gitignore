@@ -1,3 +1,4 @@
 .env
 .streamlit/secrets.toml
 f87_faiss.index
+.ipynb
