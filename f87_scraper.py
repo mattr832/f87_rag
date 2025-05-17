@@ -5,23 +5,26 @@ import json
 from tqdm import tqdm
 import nltk
 from transformers import GPT2TokenizerFast
+from utilities.utils import remove_quoted_replies
 
 # === CONFIGURATION ===
 BASE_URL = "https://f87.bimmerpost.com/forums/"
 FORUM_URL_TEMPLATES = [
-    BASE_URL + "forumdisplay.php?f=652&page={}",  # Cosmetic
-    BASE_URL + "forumdisplay.php?f=646&page={}",  # Wheels/Tires
-    BASE_URL + "forumdisplay.php?f=653&page={}",  # Maintenance
-    BASE_URL + "forumdisplay.php?f=654&page={}",  # Suspension and Brakes
-    BASE_URL + "forumdisplay.php?f=722&page={}",  # S55
-    BASE_URL + "forumdisplay.php?f=651&page={}",  # N55
-    BASE_URL + "forumdisplay.php?f=660&page={}"   # Track
+    # BASE_URL + "forumdisplay.php?f=722&page={}",  # S55
+    # BASE_URL + "forumdisplay.php?f=651&page={}",  # N55
+    # BASE_URL + "forumdisplay.php?f=653&page={}",  # Maintenance
+    # BASE_URL + "forumdisplay.php?f=646&page={}",  # Wheels/Tires
+    # BASE_URL + "forumdisplay.php?f=654&page={}",  # Suspension and Brakes
+    # BASE_URL + "forumdisplay.php?f=652&page={}",  # Cosmetic Mods
+    BASE_URL + "forumdisplay.php?f=655&page={}",  # Nav and Electronics
+    BASE_URL + "forumdisplay.php?f=659&page={}",  # Cosmetic Maintenance
+    # BASE_URL + "forumdisplay.php?f=660&page={}"   # Track
 ]
 HEADERS = {
     "User-Agent": "F87M2-RAG-Bot (Contact: mattr832@gmail.com)"
 }
 DELAY = 1.0
-MAX_PAGES = 40
+MAX_PAGES = 100
 THREADS_PER_PAGE = 36
 MAX_TOKENS_PER_CHUNK = 400
 OVERLAP_TOKENS = 50
@@ -118,6 +121,48 @@ def chunk_text(text, max_tokens=MAX_TOKENS_PER_CHUNK, overlap=OVERLAP_TOKENS):
 
     return chunks
 
+# def chunk_text(text, max_tokens=MAX_TOKENS_PER_CHUNK, overlap=OVERLAP_TOKENS):
+#     if not text:
+#         return []
+
+#     sentences = nltk.sent_tokenize(text)
+#     chunks = []
+#     current_chunk = []
+#     current_len = 0
+
+#     for sentence in sentences:
+#         tokenized = tokenizer.encode(sentence, add_special_tokens=False)
+#         sent_len = len(tokenized)
+
+#         # If adding this sentence would exceed the limit
+#         if current_len + sent_len > max_tokens:
+#             # Finalize the current chunk
+#             chunk_text = " ".join(current_chunk).strip()
+#             if chunk_text:
+#                 chunks.append(chunk_text)
+
+#             # Start new chunk (with optional overlap)
+#             if overlap > 0 and chunks:
+#                 # Grab last few tokens from previous chunk for context
+#                 prev_tokens = tokenizer.encode(chunks[-1])[-overlap:]
+#                 prefix = tokenizer.decode(prev_tokens)
+#                 current_chunk = [prefix, sentence]
+#                 current_len = len(tokenizer.encode(prefix)) + sent_len
+#             else:
+#                 current_chunk = [sentence]
+#                 current_len = sent_len
+#         else:
+#             current_chunk.append(sentence)
+#             current_len += sent_len
+
+#     # Final chunk
+#     if current_chunk:
+#         chunk_text = " ".join(current_chunk).strip()
+#         if chunk_text:
+#             chunks.append(chunk_text)
+
+#     return chunks
+
 def chunk_all_threads(threads): 
     chunked_docs = []
     for thread in threads:
@@ -140,6 +185,10 @@ def chunk_all_threads(threads):
 if __name__ == "__main__":
     print("🚗 Starting multi-forum F87 M2 scrape and chunking...")
     threads = crawl_threads()
+    # Clean each thread's content
+    for thread in threads:
+        if isinstance(thread.get("content"), str):
+            thread["content"] = remove_quoted_replies(thread["content"])
     with open("f87_threads.json", "w", encoding="utf-8", errors="ignore") as f:
         json.dump(threads, f, indent=2, ensure_ascii=False)
 

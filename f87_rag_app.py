@@ -9,7 +9,6 @@ import requests
 import urllib.request
 from datetime import datetime
 import gspread
-# from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -19,12 +18,6 @@ st.set_page_config(page_title="F87 M2 AI Assistant", layout="wide")
 # === CONFIG ===
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
-INDEX_URL = "https://github.com/mattr832/f87_rag/releases/download/v1.1/f87_faiss.index"
-INDEX_PATH = "f87_faiss.index"
-
-if not os.path.exists(INDEX_PATH):
-    with st.spinner("Setting things up..."):
-        urllib.request.urlretrieve(INDEX_URL, INDEX_PATH)
 
 # Runtime check for key
 if not openai_api_key or openai_api_key.startswith("sk-old"):
@@ -33,10 +26,17 @@ if not openai_api_key or openai_api_key.startswith("sk-old"):
 
 # Manage connections and configs
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
-
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4-turbo"
 TOP_K = 6
+
+# Download index and store locally
+INDEX_URL = "https://github.com/mattr832/f87_rag/releases/download/v1.1/f87_faiss.index"
+INDEX_PATH = "f87_faiss.index"
+
+if not os.path.exists(INDEX_PATH):
+    with st.spinner("Setting things up..."):
+        urllib.request.urlretrieve(INDEX_URL, INDEX_PATH)
 
 # === Load Data ===
 index = faiss.read_index(INDEX_PATH)
@@ -120,7 +120,6 @@ def log_to_google_sheets(question, answer, context_chunks):
 
     sheet = client.open("f87_rag_logs").sheet1
 
-    from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     row = [timestamp, question, answer] + [chunk["text"][:500] for chunk in context_chunks]
     sheet.append_row(row)

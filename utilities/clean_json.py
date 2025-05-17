@@ -1,12 +1,19 @@
 from utils import remove_quoted_replies
-from f87_scraper import chunk_all_threads
 import json
+import sys
+import os
+
+# Add parent directory to Python path
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(parent_dir)
+
+from f87_scraper import chunk_all_threads
 
 # Load threads
 with open("f87_threads.json", "r", encoding="utf-8") as f:
     threads = json.load(f)
 
-# Clean each thread's content
+# # Clean each thread's content
 for thread in threads:
     if isinstance(thread.get("content"), str):
         thread["content"] = remove_quoted_replies(thread["content"])
