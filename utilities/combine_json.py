@@ -1,11 +1,11 @@
 import json
 
 # Load the first JSON file
-with open("f87_threads1.json", "r", encoding="utf-8") as f1:
+with open("f87_threads.json", "r", encoding="utf-8") as f1:
     data1 = json.load(f1)
 
 # Load the second JSON file
-with open("f87_threads2.json", "r", encoding="utf-8") as f2:
+with open("f87_threads_N55"".json", "r", encoding="utf-8") as f2:
     data2 = json.load(f2)
 
 # Combine both lists
@@ -20,7 +20,7 @@ for item in combined:
         seen_urls.add(item["url"])
 
 # Save the combined result
-with open("f87_threads.json", "w", encoding="utf-8") as f_out:
+with open("f87_threads_combined.json", "w", encoding="utf-8") as f_out:
     json.dump(combined, f_out, indent=2, ensure_ascii=False)
 
 print("✅ Combined data saved to combined_threads.json")

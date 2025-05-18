@@ -11,19 +11,20 @@ from utilities.utils import remove_quoted_replies
 BASE_URL = "https://f87.bimmerpost.com/forums/"
 FORUM_URL_TEMPLATES = [
     # BASE_URL + "forumdisplay.php?f=722&page={}",  # S55
-    # BASE_URL + "forumdisplay.php?f=651&page={}",  # N55
+    BASE_URL + "forumdisplay.php?f=651&page={}",  # N55
     # BASE_URL + "forumdisplay.php?f=653&page={}",  # Maintenance
     # BASE_URL + "forumdisplay.php?f=646&page={}",  # Wheels/Tires
     # BASE_URL + "forumdisplay.php?f=654&page={}",  # Suspension and Brakes
     # BASE_URL + "forumdisplay.php?f=652&page={}",  # Cosmetic Mods
-    BASE_URL + "forumdisplay.php?f=655&page={}",  # Nav and Electronics
-    BASE_URL + "forumdisplay.php?f=659&page={}",  # Cosmetic Maintenance
+    # BASE_URL + "forumdisplay.php?f=655&page={}",  # Nav and Electronics
+    # BASE_URL + "forumdisplay.php?f=659&page={}",  # Cosmetic Maintenance
     # BASE_URL + "forumdisplay.php?f=660&page={}"   # Track
 ]
 HEADERS = {
     "User-Agent": "F87M2-RAG-Bot (Contact: mattr832@gmail.com)"
 }
 DELAY = 1.0
+START_PAGE = 1
 MAX_PAGES = 100
 THREADS_PER_PAGE = 36
 MAX_TOKENS_PER_CHUNK = 400
@@ -72,7 +73,7 @@ def extract_thread_content(thread_html):
     content = "\n\n".join(post.get_text(strip=True) for post in posts)
     return {"content": content}
 
-def crawl_threads(start_page=1, max_pages=MAX_PAGES, threads_per_page=THREADS_PER_PAGE):
+def crawl_threads(start_page=START_PAGE, max_pages=MAX_PAGES, threads_per_page=THREADS_PER_PAGE):
     all_threads = []
 
     for template in FORUM_URL_TEMPLATES:
