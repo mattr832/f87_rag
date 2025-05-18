@@ -26,9 +26,13 @@ if not openai_api_key or openai_api_key.startswith("sk-old"):
 
 # Manage connections and configs
 client = OpenAI(api_key=openai_api_key)  # Replace with your secure method
+GITHUB_RELEASE = 'v1.1'
+CHUNKING = 'max-token400-overlay50'
 EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4-turbo"
 TOP_K = 6
+RAG_VERSION = GITHUB_RELEASE + CHUNKING + EMBED_MODEL + CHAT_MODEL
+
 
 # Download index and store locally
 INDEX_URL = "https://github.com/mattr832/f87_rag/releases/download/v1.1/f87_faiss.index"
@@ -107,7 +111,7 @@ def send_to_slack(question, answer, confidence_label, top_chunk_url, user_commen
     except Exception as e:
         print(f"[Slack] Failed to send alert: {e}")
 
-def log_to_google_sheets(question, answer, context_chunks):
+def log_to_google_sheets(rag_version, question, answer, context_chunks):
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
@@ -121,7 +125,7 @@ def log_to_google_sheets(question, answer, context_chunks):
     sheet = client.open("f87_rag_logs").sheet1
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    row = [timestamp, question, answer] + [chunk["text"][:500] for chunk in context_chunks]
+    row = [timestamp, rag_version, question, answer] + [chunk["text"][:500] for chunk in context_chunks]
     sheet.append_row(row)
 
 # ====================
@@ -222,7 +226,7 @@ if st.button("Ask") and new_question:
         answer = generate_answer(prompt)
 
         # Log to Google Sheets
-        log_to_google_sheets(new_question, answer, context_chunks)
+        log_to_google_sheets(RAG_VERSION, new_question, answer, context_chunks)
 
         # Display new response immediately
         st.markdown(f"**You:** {new_question}")
